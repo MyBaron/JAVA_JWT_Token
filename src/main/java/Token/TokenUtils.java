@@ -3,6 +3,13 @@ package Token;
 import com.nimbusds.jose.*;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jose.jwk.JWK;
+import com.nimbusds.jose.jwk.RSAKey;
+import com.nimbusds.jose.jwk.gen.RSAKeyGenerator;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import net.minidev.json.JSONObject;
 
 import java.text.ParseException;
@@ -23,7 +30,7 @@ public class TokenUtils {
 
 
     //生成一个token
-    public static String creatToken(Map<String,Object> payloadMap) throws JOSEException {
+    public static String creatTokenHS256(Map<String,Object> payloadMap) throws JOSEException {
 
         //3.先建立一个头部Header
         /**
@@ -54,30 +61,27 @@ public class TokenUtils {
 
 
     }
-
-
-    //解析一个token
-
-    public static Map<String,Object> valid(String token) throws ParseException, JOSEException {
-
+    //解析token
+    public static Map<String,Object> validHS256(String token) throws ParseException, JOSEException {
 //        解析token
-
         JWSObject jwsObject = JWSObject.parse(token);
-
-        //获取到载荷
-        Payload payload=jwsObject.getPayload();
-
         //建立一个解锁密匙
         JWSVerifier jwsVerifier = new MACVerifier(secret);
+        return verify(jwsObject, jwsVerifier);
+    }
 
+
+    //验证token信息
+    private static Map<String,Object> verify(JWSObject jwsObject,JWSVerifier jwsVerifier) throws JOSEException {
         Map<String, Object> resultMap = new HashMap<>();
+        //获取到载荷
+        Payload payload=jwsObject.getPayload();
         //判断token
         if (jwsObject.verify(jwsVerifier)) {
             resultMap.put("Result", 0);
             //载荷的数据解析成json对象。
             JSONObject jsonObject = payload.toJSONObject();
             resultMap.put("data", jsonObject);
-
             //判断token是否过期
             if (jsonObject.containsKey("exp")) {
                 Long expTime = Long.valueOf(jsonObject.get("exp").toString());
@@ -87,14 +91,47 @@ public class TokenUtils {
                     //已经过期
                     resultMap.clear();
                     resultMap.put("Result", 2);
-
                 }
             }
         }else {
             resultMap.put("Result", 1);
         }
-
         return resultMap;
+    }
 
+    /**
+     * 创建加密key
+     */
+    public static RSAKey getKey() throws JOSEException {
+        RSAKeyGenerator rsaKeyGenerator = new RSAKeyGenerator(2048);
+        RSAKey rsaJWK = rsaKeyGenerator.generate();
+        return rsaJWK;
+    }
+
+    //进行token加密
+    public static String creatTokenRS256(Map<String,Object> payloadMap,RSAKey rsaJWK) throws JOSEException {
+
+        //私密钥匙
+        JWSSigner signer = new RSASSASigner(rsaJWK);
+
+        JWSObject jwsObject = new JWSObject(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaJWK.getKeyID()).build(),
+                new Payload(new JSONObject(payloadMap))
+        );
+        //进行加密
+        jwsObject.sign(signer);
+
+        String token= jwsObject.serialize();
+        return token;
+    }
+
+    //验证token
+    public static Map<String,Object> validRS256(String token,RSAKey rsaJWK) throws ParseException, JOSEException {
+        //获取到公钥
+        RSAKey rsaKey = rsaJWK.toPublicJWK();
+        JWSObject jwsObject = JWSObject.parse(token);
+        JWSVerifier jwsVerifier = new RSASSAVerifier(rsaKey);
+        //验证数据
+        return verify(jwsObject, jwsVerifier);
     }
 }

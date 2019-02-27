@@ -8,13 +8,16 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-public class TokenTest {
+public class TokenHS256 {
 
+
+    /**
+     * 这个方法采取的是HS256 对称加密算法
+     */
 
     //生成token的业务逻辑
     public static String TokenTest(String uid) {
         //获取生成token
-
         Map<String, Object> map = new HashMap<>();
 
         //建立载荷，这些数据根据业务，自己定义。
@@ -24,7 +27,7 @@ public class TokenTest {
         //过期时间
         map.put("exp", new Date().getTime()+6);
         try {
-            String token = TokenUtils.creatToken(map);
+            String token = TokenUtils.creatTokenHS256(map);
             System.out.println("token="+token);
             return token;
         } catch (JOSEException e) {
@@ -41,7 +44,7 @@ public class TokenTest {
         try {
             if (token != null) {
 
-                Map<String, Object> validMap = TokenUtils.valid(token);
+                Map<String, Object> validMap = TokenUtils.validHS256(token);
                 int i = (int) validMap.get("Result");
                 if (i == 0) {
                     System.out.println("token解析成功");
